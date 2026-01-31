@@ -1,5 +1,5 @@
 {
-  "name": "noise-reducer-pwa",
+  "name": "background-noise-remover",
   "compatibility_date": "2024-09-23",
   "assets": {
     "directory": "./dist",
