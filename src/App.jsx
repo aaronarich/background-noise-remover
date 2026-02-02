@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
@@ -18,28 +18,78 @@ function App() {
     if (ffmpegLoaded) return true;
 
     const ffmpeg = ffmpegRef.current
+
+    // Clear previous listeners to avoid duplicates if re-running
+    ffmpeg.off('log')
+    ffmpeg.off('progress')
+
     ffmpeg.on('log', ({ message }) => {
         if (messageRef.current) messageRef.current.innerHTML = message
         console.log(message)
     })
 
     // Progress is 0 to 1
-    ffmpeg.on('progress', ({ progress, time }) => {
+    ffmpeg.on('progress', ({ progress }) => {
         setProgress(progress)
     })
 
-    try {
-        setStatus('loading_ffmpeg')
+    const loadMT = async () => {
+        try {
+            const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd'
+            await ffmpeg.load({
+                coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
+            })
+            console.log("Loaded FFmpeg (Multi-Threaded)");
+            return true;
+        } catch (e) {
+            console.warn("Failed to load Multi-Threaded FFmpeg, falling back to Single-Threaded", e);
+            return false;
+        }
+    }
+
+    const loadST = async () => {
+        console.log("Attempting to load Single-Threaded FFmpeg");
         const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
         await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
         })
+        console.log("Loaded FFmpeg (Single-Threaded)");
+    }
+
+    try {
+        setStatus('loading_ffmpeg')
+
+        let loaded = false;
+        // Check for SharedArrayBuffer support
+        // Note: window.crossOriginIsolated is required for SharedArrayBuffer
+        if (window.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined') {
+             loaded = await loadMT();
+        } else {
+             console.log("SharedArrayBuffer not available, skipping Multi-Threaded attempt.");
+        }
+
+        if (!loaded) {
+             // If MT failed or not supported, try ST
+             // If we tried MT and failed, we might need to reset the ffmpeg instance?
+             // Usually load() failing throws, but if we catch it, the instance might be in weird state.
+             // But let's try calling load() again.
+             // If needed, we could do: ffmpegRef.current = new FFmpeg(); (and rebind listeners)
+             // For now, assume it's fine or that loadMT cleaned up.
+
+             // Actually, to be safe, let's terminate if it was partially loaded?
+             try { await ffmpeg.terminate(); } catch { /* ignore */ }
+
+             await loadST();
+        }
+
         setFfmpegLoaded(true)
         return true
     } catch (error) {
         console.error(error)
-        setErrorMessage('Failed to load FFmpeg. Your browser might not support it (SharedArrayBuffer).')
+        setErrorMessage(`Failed to load FFmpeg. Error: ${error.message || error}`)
         setStatus('error')
         return false
     }
