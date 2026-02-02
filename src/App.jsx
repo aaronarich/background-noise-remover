@@ -35,7 +35,7 @@ function App() {
 
     const loadMT = async () => {
         try {
-            const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd'
+            const baseURL = '/ffmpeg/core-mt'
             await ffmpeg.load({
                 coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
                 wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
@@ -51,7 +51,7 @@ function App() {
 
     const loadST = async () => {
         console.log("Attempting to load Single-Threaded FFmpeg");
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
+        const baseURL = '/ffmpeg/core'
         await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
